@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="//cdn.quilljs.com/0.20.1/quill.js"></script>
+    <script src="//cdn.firebase.com/js/client/2.4.0/firebase.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/lodash.js/4.3.0/lodash.min.js"></script>
+  </head>
+  <body>
+    <div id="editor">
+    </div>
+
+    <script>
+      var my_id = Math.random();  // TODO: better id's
+      var quill = new Quill('#editor');
+
+      var fp = new Firebase('https://jix.firebaseio.com/');
+      var deltaRef = fp.child("delta");
+
+      var history = [];
+      var speculative_history = [];
+
+      quill.on('text-change', function(delta, source) {
+        if (source == "user") {
+          delta["ops"].user_id = my_id;
+
+          var obj = {"user_id": my_id};
+          for (var i=0; i<delta["ops"].length; i++) {
+            obj[i] = ops[i];
+          }
+          speculative_history.push(obj);
+
+          deltaRef.transaction(function(current_value) {
+            current_value = (current_value || []);
+            current_value.push(delta["ops"]);
+            return current_value;
+          });
+        }
+      });
+
+      deltaRef.on("child_added", function(snapshot) {
+        var delta_ops = snapshot.val();
+        x = delta_ops;
+        console.log(delta_ops);
+        if (delta_ops["user_id"] == my_id) {  // my first
+          if (speculative_history.length > 0 &&
+              _.isEqual(speculative_history[0], delta_ops)) {
+            speculative_history.splice(0, 1);
+            return;
+          }
+        }
+
+      });
+    </script>
+  </body>
+</html>
